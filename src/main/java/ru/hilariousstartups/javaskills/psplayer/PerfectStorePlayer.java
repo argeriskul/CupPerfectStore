@@ -54,6 +54,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                 request.setHireEmployeeCommands(hireEmployeeCommands);
                 // Смотрим на каких кассах нет кассира (либо не был назначен, либо ушел с кассы отдыхать), нанимаем новых кассиров и ставим на эти кассы.
                 // Нанимаем самых опытных!
+                // TODO hire only if here are too many customers
                 currentWorldResponse.getCheckoutLines().stream().filter(line -> line.getEmployeeId() == null).forEach(line -> {
                     HireEmployeeCommand hireEmployeeCommand = new HireEmployeeCommand();
                     hireEmployeeCommand.setCheckoutLineId(line.getId());
