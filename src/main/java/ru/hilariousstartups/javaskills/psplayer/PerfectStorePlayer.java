@@ -21,7 +21,8 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
     private Set<Customer> customersOnCheckline = new HashSet<>();
     private Set<Customer> awaitingCustomers = new HashSet<>();
-    private Map<Integer, ProductInBasket> soldProducts = new HashMap<>(); // productId->product
+    private Map<Integer, ProductInBasket> basketProducts = new HashMap<>(); // productId->product
+    private HRDepartment hrDepartment;
 
     public PerfectStorePlayer(@Value("${rs.endpoint:http://localhost:9080}") String serverUrl) {
         this.serverUrl = serverUrl;
@@ -48,12 +49,31 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 //                    log.info("Ответ  с предыдущего шага="+currentWorldResponse);
                 }
 
+                CurrentTickRequest request = createNextMove(currentWorldResponse);
+
                 if (currentWorldResponse == null) {
                     currentWorldResponse = psApiClient.loadWorld();
-                    log.warn("Total employees=" + currentWorldResponse.getEmployees().size());
-                }
+                    // logging world
+                    log.debug("Total employees=" + currentWorldResponse.getEmployees().size());
+                    log.info("Касс=" + currentWorldResponse.getCheckoutLines().size());
+                    log.info("Полок=" + currentWorldResponse.getRackCells().size());
+                    var productAssortment = currentWorldResponse.getStock().size();
+                    var productTotalCount = currentWorldResponse.getStock().
+                            stream().mapToInt(Product::getInStock).summaryStatistics();
+                    log.info("Видов товаров=" + productAssortment + ", штук=" + productTotalCount +
+                            ", стоит=" + currentWorldResponse.getStockCosts());
+                    log.info(currentWorldResponse.getCheckoutLines().get(0).toString());
+                    // end of logging
 
-                CurrentTickRequest request = createNextMove(currentWorldResponse);
+                    // generate initial commands
+                    hrDepartment = new HRDepartment(currentWorldResponse.getRecruitmentAgency(),
+                            currentWorldResponse.getEmployees(),
+                            currentWorldResponse.getCheckoutLines().size()
+                    );
+                    request = new CurrentTickRequest();
+                    request.hireEmployeeCommands(hrDepartment.firstHire());
+                    // TODO init racks by products
+                }
 
                 currentWorldResponse = psApiClient.tick(request);
                 collectDataFromAnswer(currentWorldResponse);
@@ -62,10 +82,9 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
             while (!currentWorldResponse.isGameOver());
 
             // Если пришел Game Over, значит все время игры закончилось. Пора считать прибыль
-            log.info("Sold:" + soldProducts.values());
+            log.info("В корзинах:" + basketProducts.values());
             log.info("Я заработал " + (currentWorldResponse.getIncome() - currentWorldResponse.getSalaryCosts() - currentWorldResponse.getStockCosts()) + "руб.");
-            log.info("Total ticks:" + cnt);
-            log.info("Sold products count=" + soldProducts.size());
+            log.info("Sold products count=" + basketProducts.size());
             var awaitingCheckoutCustomersCount = currentWorldResponse.getCustomers().stream().
                     filter(it -> it.getMode().equals(Customer.ModeEnum.WAIT_CHECKOUT)).count();
             var atCheckoutCustomersCount = currentWorldResponse.getCustomers().stream().
@@ -99,11 +118,11 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                 map(it -> it.getBasket()).
                 collect(ArrayList<ProductInBasket>::new, List::addAll, List::addAll);
         for (ProductInBasket product : newAwaitingCheckoutProducts) {
-            if (soldProducts.containsKey(product.getId())) {
-                var countedProduct = soldProducts.get(product.getId());
+            if (basketProducts.containsKey(product.getId())) {
+                var countedProduct = basketProducts.get(product.getId());
                 countedProduct.setProductCount(countedProduct.getProductCount() + product.getProductCount());
             } else {
-                soldProducts.put(product.getId(), product);
+                basketProducts.put(product.getId(), product);
             }
         }
         awaitingCustomers.addAll(awaitingCheckoutCustomers);
@@ -112,6 +131,9 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
     }
 
     private CurrentTickRequest createNextMove(CurrentWorldResponse worldResponse) {
+        if (worldResponse == null) { // первый ход обрабатывается отдельно
+            return null;
+        }
         CurrentTickRequest request = new CurrentTickRequest();
 
         // TODO hire only if here are too many customers

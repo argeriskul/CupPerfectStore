@@ -136,10 +136,11 @@ public class ProductInBasket {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("{productName=").append(productName);
+    sb.append("product{").append(id).append("}");
+    sb.append(" ").append(productName);
     sb.append(" $").append(prie);
     sb.append(" Count=").append(productCount);
-    sb.append("}  ");
+    sb.append(", ");
     return sb.toString();
   }
 
