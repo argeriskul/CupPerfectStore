@@ -20,7 +20,8 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
     private String serverUrl;
 
     private Set<Customer> customersOnCheckline = new HashSet<>();
-    private Map<Integer, ProductInBasket> soldProducts = new HashMap<>(); // productId->product. product.inStock contains quantity
+    private Set<Customer> awaitingCustomers = new HashSet<>();
+    private Map<Integer, ProductInBasket> soldProducts = new HashMap<>(); // productId->product
 
     public PerfectStorePlayer(@Value("${rs.endpoint:http://localhost:9080}") String serverUrl) {
         this.serverUrl = serverUrl;
@@ -49,6 +50,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
                 if (currentWorldResponse == null) {
                     currentWorldResponse = psApiClient.loadWorld();
+                    log.warn("Total employees=" + currentWorldResponse.getEmployees().size());
                 }
 
                 CurrentTickRequest request = createNextMove(currentWorldResponse);
@@ -60,9 +62,10 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
             while (!currentWorldResponse.isGameOver());
 
             // Если пришел Game Over, значит все время игры закончилось. Пора считать прибыль
+            log.info("Sold:" + soldProducts.values());
             log.info("Я заработал " + (currentWorldResponse.getIncome() - currentWorldResponse.getSalaryCosts() - currentWorldResponse.getStockCosts()) + "руб.");
             log.info("Total ticks:" + cnt);
-            log.info("Sold products(total" + soldProducts.size() + "):" + soldProducts);
+            log.info("Sold products count=" + soldProducts.size());
             var awaitingCheckoutCustomersCount = currentWorldResponse.getCustomers().stream().
                     filter(it -> it.getMode().equals(Customer.ModeEnum.WAIT_CHECKOUT)).count();
             var atCheckoutCustomersCount = currentWorldResponse.getCustomers().stream().
@@ -91,10 +94,11 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         var atCheckoutCustomers = customers.stream().
                 filter(it -> it.getMode().equals(Customer.ModeEnum.AT_CHECKOUT)).
                 collect(Collectors.toList());
-        var awaitingCheckoutProducts = awaitingCheckoutCustomers.stream().
+        var newAwaitingCheckoutProducts = awaitingCheckoutCustomers.stream().
+                filter(it -> !awaitingCustomers.contains(it)).
                 map(it -> it.getBasket()).
                 collect(ArrayList<ProductInBasket>::new, List::addAll, List::addAll);
-        for (ProductInBasket product : awaitingCheckoutProducts) {
+        for (ProductInBasket product : newAwaitingCheckoutProducts) {
             if (soldProducts.containsKey(product.getId())) {
                 var countedProduct = soldProducts.get(product.getId());
                 countedProduct.setProductCount(countedProduct.getProductCount() + product.getProductCount());
@@ -102,11 +106,12 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                 soldProducts.put(product.getId(), product);
             }
         }
+        awaitingCustomers.addAll(awaitingCheckoutCustomers);
         customersOnCheckline.addAll(atCheckoutCustomers);
 
     }
 
-    private CurrentTickRequest createNextMove(CurrentWorldResponse currentWorldResponse) {
+    private CurrentTickRequest createNextMove(CurrentWorldResponse worldResponse) {
         CurrentTickRequest request = new CurrentTickRequest();
 
         // TODO hire only if here are too many customers
@@ -114,13 +119,15 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 //                request.setHireEmployeeCommands(hireEmployeeCommands);
         // Смотрим на каких кассах нет кассира (либо не был назначен, либо ушел с кассы отдыхать), нанимаем новых кассиров и ставим на эти кассы.
         // Нанимаем самых опытных!
-//                currentWorldResponse.getCheckoutLines().stream().filter(line -> line.getEmployeeId() == null).forEach(line -> {
+//                worldResponse.getCheckoutLines().stream().filter(line -> line.getEmployeeId() == null).forEach(line -> {
 //                    HireEmployeeCommand hireEmployeeCommand = new HireEmployeeCommand();
 //                    hireEmployeeCommand.setCheckoutLineId(line.getId());
 //                    hireEmployeeCommand.setExperience(HireEmployeeCommand.ExperienceEnum.SENIOR);
 //                    hireEmployeeCommands.add(hireEmployeeCommand);
 //                });
 //                request.setHireEmployeeCommands(hireEmployeeCommands);
+
+        inspectChecklines(worldResponse, request);
 
         // готовимся закупать товар на склад и выставлять его на полки
         ArrayList<BuyStockCommand> buyStockCommands = new ArrayList<>();
@@ -129,11 +136,11 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         ArrayList<PutOnRackCellCommand> putOnRackCellCommands = new ArrayList<>();
         request.setPutOnRackCellCommands(putOnRackCellCommands);
 
-        List<Product> stock = currentWorldResponse.getStock();
-        List<RackCell> rackCells = currentWorldResponse.getRackCells();
+        List<Product> stock = worldResponse.getStock();
+        List<RackCell> rackCells = worldResponse.getRackCells();
 
         // Обходим торговый зал и смотрим какие полки пустые. Выставляем на них товар.
-        currentWorldResponse.getRackCells().stream().filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0)).forEach(rack -> {
+        worldResponse.getRackCells().stream().filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0)).forEach(rack -> {
             Product producttoPutOnRack = null;
             if (rack.getProductId() == null) {
                 List<Integer> productsOnRack = rackCells.stream().filter(r -> r.getProductId() != null).map(RackCell::getProductId).collect(Collectors.toList());
@@ -170,6 +177,27 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
         });
         return request;
+    }
+
+    /**
+     * Здесь будет вся работа по управлению кассами: слежение за свободными кассами, ротация кассиров
+     *
+     * @param worldResponse
+     * @param request
+     */
+    private void inspectChecklines(CurrentWorldResponse worldResponse, CurrentTickRequest request) {
+        var freeEmployees = worldResponse.getEmployees(); // TODO create HR Department
+        freeEmployees.sort(Comparator.comparingInt(Employee::getExperience));
+
+        var bestEmployee = freeEmployees.isEmpty() ? null : freeEmployees.get(0);
+        var singleCheckline = worldResponse.getCheckoutLines().get(0);
+        if (singleCheckline.getEmployeeId() == null && bestEmployee != null) {
+            request.addSetOnCheckoutLineCommandsItem(
+                    new SetOnCheckoutLineCommand().checkoutLineId(singleCheckline.getId()).
+                            employeeId(bestEmployee.getId())
+            );
+        }
+
     }
 
     private void awaitServer(PerfectStoreEndpointApi psApiClient) {
