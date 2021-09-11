@@ -12,15 +12,10 @@
 
 package ru.hilariousstartups.javaskills.psplayer.swagger_codegen.model;
 
-import java.util.Objects;
-import java.util.Arrays;
-import com.google.gson.TypeAdapter;
-import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.io.IOException;
+
+import java.util.Objects;
 /**
  * Кадровое агенство. Справочная информация о том, каких сотрудников можно нанять и по какой ставке
  */
@@ -114,6 +109,16 @@ public class EmployeeRecruitmentOffer {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
+    sb.append("Type=").append((employeeType));
+    sb.append(", experience: ").append((experience));
+    sb.append(", salary: ").append((salary));
+    sb.append("}");
+    return sb.toString();
+  }
+
+  /*@Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
     sb.append("class EmployeeRecruitmentOffer {\n");
     
     sb.append("    employeeType: ").append(toIndentedString(employeeType)).append("\n");
@@ -121,7 +126,7 @@ public class EmployeeRecruitmentOffer {
     sb.append("    salary: ").append(toIndentedString(salary)).append("\n");
     sb.append("}");
     return sb.toString();
-  }
+  }*/
 
   /**
    * Convert the given object to string with each line indented by 4 spaces

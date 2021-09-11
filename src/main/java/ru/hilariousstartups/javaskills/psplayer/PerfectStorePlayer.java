@@ -23,6 +23,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
     private Set<Customer> awaitingCustomers = new HashSet<>();
     private Map<Integer, ProductInBasket> basketProducts = new HashMap<>(); // productId->product
     private HRDepartment hrDepartment;
+    private CheckoutAdmin checkoutAdmin;
 
     public PerfectStorePlayer(@Value("${rs.endpoint:http://localhost:9080}") String serverUrl) {
         this.serverUrl = serverUrl;
@@ -35,7 +36,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
         PerfectStoreEndpointApi psApiClient = new PerfectStoreEndpointApi(apiClient);
 
-        log.info("Игрок готов. Подключаемся к серверу..");
+        log.debug("Игрок готов. Подключаемся к серверу..");
         awaitServer(psApiClient);
 
         log.info("Подключение к серверу успешно. Начинаем игру");
@@ -55,12 +56,13 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     currentWorldResponse = psApiClient.loadWorld();
                     // logging world
                     log.debug("Total employees=" + currentWorldResponse.getEmployees().size());
-                    log.info("Касс=" + currentWorldResponse.getCheckoutLines().size());
+                    log.info("Кассы" + currentWorldResponse.getCheckoutLines());
                     log.info("Полок=" + currentWorldResponse.getRackCells().size());
                     var productAssortment = currentWorldResponse.getStock().size();
-                    var productTotalCount = currentWorldResponse.getStock().
-                            stream().mapToInt(Product::getInStock).summaryStatistics();
-                    log.info("Видов товаров=" + productAssortment + ", штук=" + productTotalCount +
+                    var productCountList = currentWorldResponse.getStock().
+                            stream().sorted(Comparator.comparingDouble(Product::getStockPrice))
+                            .map(Product::getInStock).collect(Collectors.toList());
+                    log.info("Видов товаров=" + productAssortment + ", штук=" + productCountList +
                             ", стоит=" + currentWorldResponse.getStockCosts());
                     log.info(currentWorldResponse.getCheckoutLines().get(0).toString());
                     // end of logging
@@ -70,6 +72,8 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                             currentWorldResponse.getEmployees(),
                             currentWorldResponse.getCheckoutLines().size()
                     );
+                    checkoutAdmin = new CheckoutAdmin(currentWorldResponse.getEmployees());
+
                     request = new CurrentTickRequest();
                     request.hireEmployeeCommands(hrDepartment.firstHire());
                     // TODO init racks by products
@@ -136,19 +140,9 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         }
         CurrentTickRequest request = new CurrentTickRequest();
 
-        // TODO hire only if here are too many customers
-//                List<HireEmployeeCommand> hireEmployeeCommands = new ArrayList<>();
-//                request.setHireEmployeeCommands(hireEmployeeCommands);
-        // Смотрим на каких кассах нет кассира (либо не был назначен, либо ушел с кассы отдыхать), нанимаем новых кассиров и ставим на эти кассы.
-        // Нанимаем самых опытных!
-//                worldResponse.getCheckoutLines().stream().filter(line -> line.getEmployeeId() == null).forEach(line -> {
-//                    HireEmployeeCommand hireEmployeeCommand = new HireEmployeeCommand();
-//                    hireEmployeeCommand.setCheckoutLineId(line.getId());
-//                    hireEmployeeCommand.setExperience(HireEmployeeCommand.ExperienceEnum.SENIOR);
-//                    hireEmployeeCommands.add(hireEmployeeCommand);
-//                });
-//                request.setHireEmployeeCommands(hireEmployeeCommands);
-
+        checkoutAdmin.considerNew(worldResponse.getEmployees(),
+                worldResponse.getCheckoutLines(),
+                worldResponse.getTickCount());
         inspectChecklines(worldResponse, request);
 
         // готовимся закупать товар на склад и выставлять его на полки
@@ -162,29 +156,39 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         List<RackCell> rackCells = worldResponse.getRackCells();
 
         // Обходим торговый зал и смотрим какие полки пустые. Выставляем на них товар.
-        worldResponse.getRackCells().stream().filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0)).forEach(rack -> {
-            Product producttoPutOnRack = null;
-            if (rack.getProductId() == null) {
-                List<Integer> productsOnRack = rackCells.stream().filter(r -> r.getProductId() != null).map(RackCell::getProductId).collect(Collectors.toList());
-                productsOnRack.addAll(putOnRackCellCommands.stream().map(c -> c.getProductId()).collect(Collectors.toList()));
-                producttoPutOnRack = stock.stream().filter(product -> !productsOnRack.contains(product.getId())).findFirst().orElse(null);
-            } else {
-                producttoPutOnRack = stock.stream().filter(product -> product.getId().equals(rack.getProductId())).findFirst().orElse(null);
-            }
+        worldResponse.getRackCells().stream()
+                .filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0))
+                .forEach(rack -> {
+                    Product producttoPutOnRack = null;
+                    if (rack.getProductId() == null) {
+                        List<Integer> productsOnRack = rackCells.stream().filter(r -> r.getProductId() != null).map(RackCell::getProductId).collect(Collectors.toList());
+                        productsOnRack.addAll(putOnRackCellCommands.stream().map(c -> c.getProductId()).collect(Collectors.toList()));
+                        producttoPutOnRack = stock.stream()
+                                .filter(product -> !productsOnRack.contains(product.getId()))
+                                .findFirst().orElse(null);
+                    } else {
+                        producttoPutOnRack = stock.stream()
+                                .filter(product -> product.getId().equals(rack.getProductId()))
+                                .findFirst().orElse(null);
+                    }
+                    if (producttoPutOnRack == null) {
+                        producttoPutOnRack = stock.stream().filter(product -> product.getInStock() > 0)
+                                .findFirst().orElse(null);
+                    }
 
-            Integer productQuantity = rack.getProductQuantity();
-            if (productQuantity == null) {
-                productQuantity = 0;
-            }
+                    Integer productQuantity = rack.getProductQuantity();
+                    if (productQuantity == null) {
+                        productQuantity = 0;
+                    }
 
-            // Вначале закупим товар на склад. Каждый ход закупать товар накладно, но ведь это тестовый игрок.
-            Integer orderQuantity = rack.getCapacity() - productQuantity;
-            if (producttoPutOnRack.getInStock() < orderQuantity) {
+                    // Вначале закупим товар на склад. Каждый ход закупать товар накладно, но ведь это тестовый игрок.
+                    Integer orderQuantity = rack.getCapacity() - productQuantity;
+            /*if (producttoPutOnRack.getInStock() < orderQuantity) {
                 BuyStockCommand command = new BuyStockCommand();
                 command.setProductId(producttoPutOnRack.getId());
                 command.setQuantity(100);
                 buyStockCommands.add(command);
-            }
+            }*/
 
             // Далее разложим на полки. И сформируем цену.
             PutOnRackCellCommand command = new PutOnRackCellCommand();
@@ -208,16 +212,16 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
      * @param request
      */
     private void inspectChecklines(CurrentWorldResponse worldResponse, CurrentTickRequest request) {
-        var freeEmployees = worldResponse.getEmployees(); // TODO create HR Department
-        freeEmployees.sort(Comparator.comparingInt(Employee::getExperience));
-
-        var bestEmployee = freeEmployees.isEmpty() ? null : freeEmployees.get(0);
+        // Стратегия "одна работающая касса", кассиры не увольняются
         var singleCheckline = worldResponse.getCheckoutLines().get(0);
-        if (singleCheckline.getEmployeeId() == null && bestEmployee != null) {
-            request.addSetOnCheckoutLineCommandsItem(
-                    new SetOnCheckoutLineCommand().checkoutLineId(singleCheckline.getId()).
-                            employeeId(bestEmployee.getId())
-            );
+        if (singleCheckline.getEmployeeId() == null) {
+            var employee = checkoutAdmin.sendToWorkAny(worldResponse.getCurrentTick());
+            if (employee != null) {
+                request.addSetOnCheckoutLineCommandsItem(
+                        new SetOnCheckoutLineCommand().checkoutLineId(singleCheckline.getId()).
+                                employeeId(employee.getId())
+                );
+            }
         }
 
     }

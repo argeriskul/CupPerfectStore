@@ -7,7 +7,6 @@ import ru.hilariousstartups.javaskills.psplayer.swagger_codegen.model.HireEmploy
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Отвечает за найим и увольнение
@@ -38,21 +37,7 @@ public class HRDepartment {
                 .checkoutLineId(1)
         );
         log.info("Всего предложений:" + recruitmentAgency.size());
-        AtomicInteger juniorsCount = new AtomicInteger();
-        AtomicInteger middleCount = new AtomicInteger();
-        AtomicInteger senjorCount = new AtomicInteger();
-        recruitmentAgency.stream().forEach(it -> {
-            if (it.getEmployeeType().equalsIgnoreCase("junior")) {
-                juniorsCount.getAndIncrement();
-            }
-            if (it.getEmployeeType().equalsIgnoreCase("middle")) {
-                middleCount.getAndIncrement();
-            }
-            if (it.getEmployeeType().equalsIgnoreCase("senior")) {
-                senjorCount.getAndIncrement();
-            }
-        });
-        log.info("Джунов=" + juniorsCount + ", midlde=" + middleCount + ", senior=" + senjorCount);
+        log.info(recruitmentAgency.toString());
         return result;
     }
 }
