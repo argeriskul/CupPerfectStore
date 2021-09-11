@@ -70,4 +70,14 @@ class EmployeeWorkTable {
         }
         return getReadyToWork() < currentTime;
     }
+
+    @Override
+    public String toString() {
+        final StringBuffer sb = new StringBuffer("EmployeeWorkTable{");
+        sb.append("employee(").append(employee.getId()).append(")");
+        sb.append(" ").append(employee.getFirstName());
+        sb.append(", started=").append(startedWork);
+        sb.append('}');
+        return sb.toString();
+    }
 }

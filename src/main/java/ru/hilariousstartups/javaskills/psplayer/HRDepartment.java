@@ -30,14 +30,20 @@ public class HRDepartment {
     }
 
     public List<HireEmployeeCommand> firstHire() {
-        List<HireEmployeeCommand> result = new ArrayList<>(checkoutCount);
-        result.add(new HireEmployeeCommand()
-                .experience(HireEmployeeCommand.ExperienceEnum.MIDDLE)
-                // TODO получать реальный id
-                .checkoutLineId(1)
-        );
+        List<HireEmployeeCommand> result = new ArrayList<>(recruitmentAgency.size());
+        for (int i = 0; i < 3 && i < recruitmentAgency.size(); i++) {
+            var offer = recruitmentAgency.get(i);
+            result.add(new HireEmployeeCommand()
+                    .experience(HireEmployeeCommand.ExperienceEnum.fromValue(offer.getEmployeeType()))
+
+            );
+
+        }
+        // TODO получать реальный id
+        result.get(0).checkoutLineId(1);
         log.info("Всего предложений:" + recruitmentAgency.size());
         log.info(recruitmentAgency.toString());
+        log.info(result.toString());
         return result;
     }
 }

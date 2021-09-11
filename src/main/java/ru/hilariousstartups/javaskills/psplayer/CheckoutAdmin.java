@@ -60,6 +60,7 @@ public class CheckoutAdmin {
                 newbieWorkTable.startWork(tickCount);
             }
             timesheet.add(newbieWorkTable);
+            log.info(newbieWorkTable.toString());
         }
     }
 }

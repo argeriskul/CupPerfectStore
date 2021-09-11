@@ -64,16 +64,16 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                             .map(Product::getInStock).collect(Collectors.toList());
                     log.info("Видов товаров=" + productAssortment + ", штук=" + productCountList +
                             ", стоит=" + currentWorldResponse.getStockCosts());
-                    log.info(currentWorldResponse.getCheckoutLines().get(0).toString());
                     // end of logging
 
-                    // generate initial commands
+                    // init state
                     hrDepartment = new HRDepartment(currentWorldResponse.getRecruitmentAgency(),
                             currentWorldResponse.getEmployees(),
                             currentWorldResponse.getCheckoutLines().size()
                     );
                     checkoutAdmin = new CheckoutAdmin(currentWorldResponse.getEmployees());
 
+                    // generate initial commands
                     request = new CurrentTickRequest();
                     request.hireEmployeeCommands(hrDepartment.firstHire());
                     // TODO init racks by products
