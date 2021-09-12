@@ -86,7 +86,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     request.buyStockCommands(merch.initialBuyIn());
                 }
 
-                currentWorldResponse = psApiClient.tick(request);
+                currentWorldResponse = psApiClient.tick(new CurrentTickRequest());
                 collectDataFromAnswer(currentWorldResponse);
 
             }
@@ -112,7 +112,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     currentWorldResponse.getCustomers().size()
             ));
 
-        } catch (ApiException e) {
+        } catch (ApiException | RuntimeException e) {
             log.error(e.getMessage(), e);
             closeStore(psApiClient, currentWorldResponse);
         }
@@ -168,8 +168,10 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
         // готовимся закупать товар на склад и выставлять его на полки
         final List<PutOnRackCellCommand> putOnRackCellCommands = merch.inspectRacks(worldResponse);
-        request.setPutOnRackCellCommands(putOnRackCellCommands);
         final List<BuyStockCommand> buyStockCommands = merch.inspectStore();
+        final List<PutOffRackCellCommand> putOffRackCellCommands = merch.removeSold();
+        request.setPutOffRackCellCommands(putOffRackCellCommands);
+        request.setPutOnRackCellCommands(putOnRackCellCommands);
         request.buyStockCommands(buyStockCommands);
         /*ArrayList<BuyStockCommand> buyStockCommands = new ArrayList<>();
         request.setBuyStockCommands(buyStockCommands);
