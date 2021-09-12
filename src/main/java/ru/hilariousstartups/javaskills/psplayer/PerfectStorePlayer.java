@@ -41,17 +41,21 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         awaitServer(psApiClient);
 
         log.info("Подключение к серверу успешно. Начинаем игру");
+        CurrentWorldResponse currentWorldResponse = null;
         try {
-            CurrentWorldResponse currentWorldResponse = null;
             int cnt = 0;
             do {
                 cnt += 1;
-                if (cnt % 60 * 4 == 0) {
+                if (cnt % (60 * 4) == 0) {
                     log.info("Пройден " + cnt + " тик");
 //                    log.info("Ответ  с предыдущего шага="+currentWorldResponse);
                 }
 
                 CurrentTickRequest request = createNextMove(currentWorldResponse);
+                if (cnt > 1 && cnt <= 3) {
+                    log.info(request.getBuyStockCommands().toString());
+                    log.info(request.getPutOnRackCellCommands().toString());
+                }
 
                 if (currentWorldResponse == null) {
                     currentWorldResponse = psApiClient.loadWorld();
@@ -65,7 +69,6 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     log.debug("Видов товаров=" + productAssortment + ", штук=" + productCountList +
                             ", стоит=" + currentWorldResponse.getStockCosts());
                     log.debug("Полок=" + currentWorldResponse.getRackCells().size());
-                    log.info(currentWorldResponse.getRackCells().toString());
                     // end of logging
 
                     // init state
@@ -90,8 +93,10 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
             while (!currentWorldResponse.isGameOver());
 
             // Если пришел Game Over, значит все время игры закончилось. Пора считать прибыль
-            log.info("В корзинах:" + basketProducts.values());
             log.info("Я заработал " + (currentWorldResponse.getIncome() - currentWorldResponse.getSalaryCosts() - currentWorldResponse.getStockCosts()) + "руб.");
+            log.info(currentWorldResponse.getStock().toString());
+            log.info(currentWorldResponse.getRackCells().toString());
+            log.info("В корзинах:" + basketProducts.values());
             log.info("Sold products count=" + basketProducts.size());
             var awaitingCheckoutCustomersCount = currentWorldResponse.getCustomers().stream().
                     filter(it -> it.getMode().equals(Customer.ModeEnum.WAIT_CHECKOUT)).count();
@@ -109,8 +114,20 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
         } catch (ApiException e) {
             log.error(e.getMessage(), e);
+            closeStore(psApiClient, currentWorldResponse);
         }
 
+    }
+
+    private void closeStore(PerfectStoreEndpointApi psApiClient, CurrentWorldResponse currentWorldResponse) {
+        CurrentTickRequest request = new CurrentTickRequest();
+        do {
+            try {
+                currentWorldResponse = psApiClient.tick(request);
+            } catch (ApiException e) {
+                log.error("Failed to process empty request: " + e.getMessage());
+            }
+        } while (!currentWorldResponse.isGameOver());
     }
 
     private void collectDataFromAnswer(CurrentWorldResponse worldResponse) {

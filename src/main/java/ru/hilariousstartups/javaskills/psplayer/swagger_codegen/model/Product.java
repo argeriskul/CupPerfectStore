@@ -153,12 +153,11 @@ public class Product {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("{");
-    sb.append("id=").append((id));
-    sb.append("} ").append((name));
-    sb.append(" stockPrice=").append((stockPrice));
+    sb.append("{").append((id)).append("}");
+    sb.append(" ").append((name));
+    sb.append(" stock $").append((stockPrice));
     sb.append(" inStock=").append((inStock));
-    sb.append(" sellPrice=").append((sellPrice));
+    sb.append(" sell $=").append((sellPrice));
     return sb.toString();
   }
 

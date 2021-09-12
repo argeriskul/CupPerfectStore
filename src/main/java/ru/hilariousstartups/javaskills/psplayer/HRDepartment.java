@@ -41,9 +41,9 @@ public class HRDepartment {
         }
         // TODO получать реальный id
         result.get(0).checkoutLineId(1);
-        log.info("Всего предложений:" + recruitmentAgency.size());
-        log.info(recruitmentAgency.toString());
-        log.info(result.toString());
+        log.debug("Всего предложений:" + recruitmentAgency.size());
+        log.debug(recruitmentAgency.toString());
+        log.debug(result.toString());
         return result;
     }
 }
