@@ -24,6 +24,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
     private Map<Integer, ProductInBasket> basketProducts = new HashMap<>(); // productId->product
     private HRDepartment hrDepartment;
     private CheckoutAdmin checkoutAdmin;
+    private Merchandaizer merch;
 
     public PerfectStorePlayer(@Value("${rs.endpoint:http://localhost:9080}") String serverUrl) {
         this.serverUrl = serverUrl;
@@ -45,7 +46,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
             int cnt = 0;
             do {
                 cnt += 1;
-                if (cnt % 120 == 0) {
+                if (cnt % 60 * 4 == 0) {
                     log.info("Пройден " + cnt + " тик");
 //                    log.info("Ответ  с предыдущего шага="+currentWorldResponse);
                 }
@@ -57,13 +58,14 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     // logging world
                     log.debug("Total employees=" + currentWorldResponse.getEmployees().size());
                     log.debug("Кассы" + currentWorldResponse.getCheckoutLines());
-                    log.debug("Полок=" + currentWorldResponse.getRackCells().size());
                     var productAssortment = currentWorldResponse.getStock().size();
                     var productCountList = currentWorldResponse.getStock().
                             stream().sorted(Comparator.comparingDouble(Product::getStockPrice))
                             .map(Product::getInStock).collect(Collectors.toList());
                     log.debug("Видов товаров=" + productAssortment + ", штук=" + productCountList +
                             ", стоит=" + currentWorldResponse.getStockCosts());
+                    log.debug("Полок=" + currentWorldResponse.getRackCells().size());
+                    log.info(currentWorldResponse.getRackCells().toString());
                     // end of logging
 
                     // init state
@@ -72,11 +74,13 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                             currentWorldResponse.getCheckoutLines().size()
                     );
                     checkoutAdmin = new CheckoutAdmin(currentWorldResponse.getEmployees());
+                    merch = new Merchandaizer(currentWorldResponse.getRackCells(),
+                            currentWorldResponse.getStock());
 
                     // generate initial commands
                     request = new CurrentTickRequest();
                     request.hireEmployeeCommands(hrDepartment.firstHire());
-                    // TODO init racks by products
+                    request.buyStockCommands(merch.initialBuyIn());
                 }
 
                 currentWorldResponse = psApiClient.tick(request);
@@ -146,33 +150,37 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         inspectChecklines(worldResponse, request);
 
         // готовимся закупать товар на склад и выставлять его на полки
-        ArrayList<BuyStockCommand> buyStockCommands = new ArrayList<>();
+        final List<PutOnRackCellCommand> putOnRackCellCommands = merch.inspectRacks(worldResponse);
+        request.setPutOnRackCellCommands(putOnRackCellCommands);
+        final List<BuyStockCommand> buyStockCommands = merch.inspectStore();
+        request.buyStockCommands(buyStockCommands);
+        /*ArrayList<BuyStockCommand> buyStockCommands = new ArrayList<>();
         request.setBuyStockCommands(buyStockCommands);
 
         ArrayList<PutOnRackCellCommand> putOnRackCellCommands = new ArrayList<>();
-        request.setPutOnRackCellCommands(putOnRackCellCommands);
+
 
         List<Product> stock = worldResponse.getStock();
         List<RackCell> rackCells = worldResponse.getRackCells();
 
         // Обходим торговый зал и смотрим какие полки пустые. Выставляем на них товар.
-        worldResponse.getRackCells().stream()
+        /*worldResponse.getRackCells().stream()
                 .filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0))
                 .forEach(rack -> {
-                    Product producttoPutOnRack = null;
+                    Product productToPutOnRack = null;
                     if (rack.getProductId() == null) {
                         List<Integer> productsOnRack = rackCells.stream().filter(r -> r.getProductId() != null).map(RackCell::getProductId).collect(Collectors.toList());
                         productsOnRack.addAll(putOnRackCellCommands.stream().map(c -> c.getProductId()).collect(Collectors.toList()));
-                        producttoPutOnRack = stock.stream()
+                        productToPutOnRack = stock.stream()
                                 .filter(product -> !productsOnRack.contains(product.getId()))
                                 .findFirst().orElse(null);
                     } else {
-                        producttoPutOnRack = stock.stream()
+                        productToPutOnRack = stock.stream()
                                 .filter(product -> product.getId().equals(rack.getProductId()))
                                 .findFirst().orElse(null);
                     }
-                    if (producttoPutOnRack == null) {
-                        producttoPutOnRack = stock.stream().filter(product -> product.getInStock() > 0)
+                    if (productToPutOnRack == null) {
+                        productToPutOnRack = stock.stream().filter(product -> product.getInStock() > 0)
                                 .findFirst().orElse(null);
                     }
 
@@ -183,25 +191,25 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
                     // Вначале закупим товар на склад. Каждый ход закупать товар накладно, но ведь это тестовый игрок.
                     Integer orderQuantity = rack.getCapacity() - productQuantity;
-                    if (producttoPutOnRack.getInStock() < orderQuantity) {
+                    if (productToPutOnRack.getInStock() < orderQuantity) {
                         BuyStockCommand command = new BuyStockCommand();
-                        command.setProductId(producttoPutOnRack.getId());
+                        command.setProductId(productToPutOnRack.getId());
                         command.setQuantity(100);
                         buyStockCommands.add(command);
                     }
 
             // Далее разложим на полки. И сформируем цену.
             PutOnRackCellCommand command = new PutOnRackCellCommand();
-            command.setProductId(producttoPutOnRack.getId());
+            command.setProductId(productToPutOnRack.getId());
             command.setRackCellId(rack.getId());
             command.setProductQuantity(orderQuantity);
-            if (producttoPutOnRack.getSellPrice() == null) {
-                final int margin = 1;
-                command.setSellPrice(producttoPutOnRack.getStockPrice() + margin);
+            if (productToPutOnRack.getSellPrice() == null) {
+                final int margin = (int)Math.round(productToPutOnRack.getStockPrice()*0.1);
+                command.setSellPrice(productToPutOnRack.getStockPrice() + margin);
             }
             putOnRackCellCommands.add(command);
 
-        });
+        });*/
         return request;
     }
 
