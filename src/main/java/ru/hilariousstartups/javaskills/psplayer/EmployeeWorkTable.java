@@ -7,11 +7,11 @@ import ru.hilariousstartups.javaskills.psplayer.swagger_codegen.model.Employee;
 class EmployeeWorkTable {
     private final static int HOUR_IN_TICKS = 60;
     private final static int WORK_SHIFT_IN_TICKS = 8 * HOUR_IN_TICKS;
-    private final static int REST_TIME_IN_TICKS = 16 * WORK_SHIFT_IN_TICKS;
+    private final static int REST_TIME_IN_TICKS = 16 * HOUR_IN_TICKS;
 
     @NonNull
-    Employee employee;
-    Integer startedWork = null;
+    private Employee employee;
+    private Integer startedWork = null;
 
     public EmployeeWorkTable(Employee employee) {
         this.employee = employee;
@@ -68,7 +68,19 @@ class EmployeeWorkTable {
         if (startedWork == null) {
             return true;
         }
-        return getReadyToWork() < currentTime;
+        return getReadyToWork() <= currentTime;
+    }
+
+    public static int getWorkShiftInTicks() {
+        return WORK_SHIFT_IN_TICKS;
+    }
+
+    public static int getRestTimeInTicks() {
+        return REST_TIME_IN_TICKS;
+    }
+
+    public static int getHourInTicks() {
+        return HOUR_IN_TICKS;
     }
 
     @Override
@@ -76,6 +88,8 @@ class EmployeeWorkTable {
         final StringBuffer sb = new StringBuffer("EmployeeWorkTable{");
         sb.append("employee(").append(employee.getId()).append(")");
         sb.append(" ").append(employee.getFirstName());
+        sb.append(", exp=").append(employee.getExperience());
+        sb.append(", $").append(employee.getSalary());
         sb.append(", started=").append(startedWork);
         sb.append('}');
         return sb.toString();

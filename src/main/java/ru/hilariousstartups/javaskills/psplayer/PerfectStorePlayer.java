@@ -56,13 +56,13 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
                     currentWorldResponse = psApiClient.loadWorld();
                     // logging world
                     log.debug("Total employees=" + currentWorldResponse.getEmployees().size());
-                    log.info("Кассы" + currentWorldResponse.getCheckoutLines());
-                    log.info("Полок=" + currentWorldResponse.getRackCells().size());
+                    log.debug("Кассы" + currentWorldResponse.getCheckoutLines());
+                    log.debug("Полок=" + currentWorldResponse.getRackCells().size());
                     var productAssortment = currentWorldResponse.getStock().size();
                     var productCountList = currentWorldResponse.getStock().
                             stream().sorted(Comparator.comparingDouble(Product::getStockPrice))
                             .map(Product::getInStock).collect(Collectors.toList());
-                    log.info("Видов товаров=" + productAssortment + ", штук=" + productCountList +
+                    log.debug("Видов товаров=" + productAssortment + ", штук=" + productCountList +
                             ", стоит=" + currentWorldResponse.getStockCosts());
                     // end of logging
 
@@ -142,7 +142,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
         checkoutAdmin.considerNew(worldResponse.getEmployees(),
                 worldResponse.getCheckoutLines(),
-                worldResponse.getTickCount());
+                worldResponse.getCurrentTick());
         inspectChecklines(worldResponse, request);
 
         // готовимся закупать товар на склад и выставлять его на полки
@@ -183,12 +183,12 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
 
                     // Вначале закупим товар на склад. Каждый ход закупать товар накладно, но ведь это тестовый игрок.
                     Integer orderQuantity = rack.getCapacity() - productQuantity;
-            /*if (producttoPutOnRack.getInStock() < orderQuantity) {
-                BuyStockCommand command = new BuyStockCommand();
-                command.setProductId(producttoPutOnRack.getId());
-                command.setQuantity(100);
-                buyStockCommands.add(command);
-            }*/
+                    if (producttoPutOnRack.getInStock() < orderQuantity) {
+                        BuyStockCommand command = new BuyStockCommand();
+                        command.setProductId(producttoPutOnRack.getId());
+                        command.setQuantity(100);
+                        buyStockCommands.add(command);
+                    }
 
             // Далее разложим на полки. И сформируем цену.
             PutOnRackCellCommand command = new PutOnRackCellCommand();

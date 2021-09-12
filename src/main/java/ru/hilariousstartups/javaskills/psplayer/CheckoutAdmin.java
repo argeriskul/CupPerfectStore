@@ -17,9 +17,10 @@ public class CheckoutAdmin {
 
     private List<Employee> employees;
     private List<EmployeeWorkTable> timesheet;
+    private boolean notFailed = false;
 
     public CheckoutAdmin(List<Employee> employees) {
-        this.employees = employees;
+        this.employees = new ArrayList<>(employees);
         init();
     }
 
@@ -37,11 +38,15 @@ public class CheckoutAdmin {
                 .filter(it -> it.isReadyToWork(currentTime))
                 .findAny().orElse(null);
         if (candidate == null) {
-            log.warn("Not enough employees to work!");
+            if (notFailed || currentTime % 120 == 0) {
+                log.warn("Not enough employees to work at=" + currentTime + ", " + timesheet);
+            }
+            notFailed = false;
             return null;
         }
+        notFailed = true;
         candidate.startWork(currentTime);
-        return candidate.employee;
+        return candidate.getEmployee();
     }
 
     // TODO add tests
@@ -62,5 +67,13 @@ public class CheckoutAdmin {
             timesheet.add(newbieWorkTable);
             log.info(newbieWorkTable.toString());
         }
+    }
+
+    public List<Employee> getEmployees() {
+        return employees;
+    }
+
+    public List<EmployeeWorkTable> getTimesheet() {
+        return timesheet;
     }
 }
