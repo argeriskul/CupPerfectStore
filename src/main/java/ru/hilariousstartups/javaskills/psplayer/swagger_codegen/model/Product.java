@@ -12,15 +12,10 @@
 
 package ru.hilariousstartups.javaskills.psplayer.swagger_codegen.model;
 
-import java.util.Objects;
-import java.util.Arrays;
-import com.google.gson.TypeAdapter;
-import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.annotations.SerializedName;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonWriter;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.io.IOException;
+
+import java.util.Objects;
 /**
  * Продукт (товар) находится либо на складе либо может быть выложен на полку в магазине. Один продукт может лежать только на одной полке. Продукт на склад можно докупить по закупочной цене. И выставить на полку по любой цене. Чем дороже цена, тем сложнее покупателям купить товар.
  */
@@ -158,14 +153,11 @@ public class Product {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("class Product {\n");
-    
-    sb.append("    id: ").append(toIndentedString(id)).append("\n");
-    sb.append("    name: ").append(toIndentedString(name)).append("\n");
-    sb.append("    stockPrice: ").append(toIndentedString(stockPrice)).append("\n");
-    sb.append("    inStock: ").append(toIndentedString(inStock)).append("\n");
-    sb.append("    sellPrice: ").append(toIndentedString(sellPrice)).append("\n");
-    sb.append("}");
+    sb.append("{").append((id)).append("}");
+    sb.append(" ").append((name));
+    sb.append(" stock $").append((stockPrice));
+    sb.append(" inStock=").append((inStock));
+    sb.append(" sell $=").append((sellPrice));
     return sb.toString();
   }
 

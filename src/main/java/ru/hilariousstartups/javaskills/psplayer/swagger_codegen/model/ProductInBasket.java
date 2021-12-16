@@ -124,7 +124,7 @@ public class ProductInBasket {
     return Objects.equals(this.id, productInBasket.id) &&
         Objects.equals(this.productName, productInBasket.productName) &&
         Objects.equals(this.prie, productInBasket.prie) &&
-        Objects.equals(this.productCount, productInBasket.productCount);
+            Objects.equals(this.productCount, productInBasket.productCount);
   }
 
   @Override
@@ -136,6 +136,17 @@ public class ProductInBasket {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
+    sb.append("product{").append(id).append("}");
+    sb.append(" ").append(productName);
+    sb.append(" $").append(prie);
+    sb.append(" Count=").append(productCount);
+    sb.append(", ");
+    return sb.toString();
+  }
+
+  /*@Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
     sb.append("class ProductInBasket {\n");
     
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
@@ -144,7 +155,7 @@ public class ProductInBasket {
     sb.append("    productCount: ").append(toIndentedString(productCount)).append("\n");
     sb.append("}");
     return sb.toString();
-  }
+  }*/
 
   /**
    * Convert the given object to string with each line indented by 4 spaces
