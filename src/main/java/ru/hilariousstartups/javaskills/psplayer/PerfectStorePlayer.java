@@ -173,62 +173,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         request.setPutOffRackCellCommands(putOffRackCellCommands);
         request.setPutOnRackCellCommands(putOnRackCellCommands);
         request.buyStockCommands(buyStockCommands);
-        /*ArrayList<BuyStockCommand> buyStockCommands = new ArrayList<>();
-        request.setBuyStockCommands(buyStockCommands);
 
-        ArrayList<PutOnRackCellCommand> putOnRackCellCommands = new ArrayList<>();
-
-
-        List<Product> stock = worldResponse.getStock();
-        List<RackCell> rackCells = worldResponse.getRackCells();
-
-        // Обходим торговый зал и смотрим какие полки пустые. Выставляем на них товар.
-        /*worldResponse.getRackCells().stream()
-                .filter(rack -> rack.getProductId() == null || rack.getProductQuantity().equals(0))
-                .forEach(rack -> {
-                    Product productToPutOnRack = null;
-                    if (rack.getProductId() == null) {
-                        List<Integer> productsOnRack = rackCells.stream().filter(r -> r.getProductId() != null).map(RackCell::getProductId).collect(Collectors.toList());
-                        productsOnRack.addAll(putOnRackCellCommands.stream().map(c -> c.getProductId()).collect(Collectors.toList()));
-                        productToPutOnRack = stock.stream()
-                                .filter(product -> !productsOnRack.contains(product.getId()))
-                                .findFirst().orElse(null);
-                    } else {
-                        productToPutOnRack = stock.stream()
-                                .filter(product -> product.getId().equals(rack.getProductId()))
-                                .findFirst().orElse(null);
-                    }
-                    if (productToPutOnRack == null) {
-                        productToPutOnRack = stock.stream().filter(product -> product.getInStock() > 0)
-                                .findFirst().orElse(null);
-                    }
-
-                    Integer productQuantity = rack.getProductQuantity();
-                    if (productQuantity == null) {
-                        productQuantity = 0;
-                    }
-
-                    // Вначале закупим товар на склад. Каждый ход закупать товар накладно, но ведь это тестовый игрок.
-                    Integer orderQuantity = rack.getCapacity() - productQuantity;
-                    if (productToPutOnRack.getInStock() < orderQuantity) {
-                        BuyStockCommand command = new BuyStockCommand();
-                        command.setProductId(productToPutOnRack.getId());
-                        command.setQuantity(100);
-                        buyStockCommands.add(command);
-                    }
-
-            // Далее разложим на полки. И сформируем цену.
-            PutOnRackCellCommand command = new PutOnRackCellCommand();
-            command.setProductId(productToPutOnRack.getId());
-            command.setRackCellId(rack.getId());
-            command.setProductQuantity(orderQuantity);
-            if (productToPutOnRack.getSellPrice() == null) {
-                final int margin = (int)Math.round(productToPutOnRack.getStockPrice()*0.1);
-                command.setSellPrice(productToPutOnRack.getStockPrice() + margin);
-            }
-            putOnRackCellCommands.add(command);
-
-        });*/
         return request;
     }
 
