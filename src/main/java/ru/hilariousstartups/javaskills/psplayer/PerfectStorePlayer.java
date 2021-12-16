@@ -173,7 +173,7 @@ public class PerfectStorePlayer implements ApplicationListener<ApplicationReadyE
         request.setPutOffRackCellCommands(putOffRackCellCommands);
         request.setPutOnRackCellCommands(putOnRackCellCommands);
         request.buyStockCommands(buyStockCommands);
-
+        System.out.println("balbla");
         return request;
     }
 
